@@ -4,7 +4,7 @@ import (
 	net
 	json
 	log
-	http
+	net.http
 )
 
 pub const (
@@ -118,17 +118,17 @@ fn err_message(err_code int) string {
 	return msg
 }
 
-fn find_between(s string, start, end string) string {
-	start_pos := s.index(start)
-	if start_pos == -1 {
-		return ''
+// get_text_between gets all the text inside `s` between `start` character and `end` character
+fn get_text_between(s string, start, end string) string {
+	start_pos := s.index(start) or {
+		return ""
 	}
-
+	
 	val := s.right(start_pos + start.len)
-	end_pos := val.last_index(end)
-	if end_pos == -1 {
+	end_pos := val.last_index(end) or {
 		return val
 	}
+
 	return val.left(end_pos)
 }
 
@@ -151,26 +151,35 @@ fn (res Response) json() string {
 	return '{' + res_json_arr.join(',') + '}'
 }
 
-fn (err ResponseError) str() string {
+pub fn (err ResponseError) str() string {
 	return json.encode(err)
 }
 
 fn (res &Response) send(conn net.Socket) {
+	mut logg := log.Log{ level: 4 }
 	res_json := res.json()
 
-	conn.write('Content-Length: ${res_json.len}\r')
-	conn.write('')
-	conn.write(res_json)
+	// TODO: is there a way to avoid this dup of `or`?
+	conn.write('Content-Length: ${res_json.len}\r') or {
+		logg.error("something went wrong during socket write")
+	}
+	conn.write('') or {
+		logg.error("something went wrong during socket write")
+	}
+	conn.write(res_json) or {
+		logg.error("something went wrong during socket write")
+	}
 }
 
 fn process_request(raw_req RawRequest) Request {
 	mut req := Request{JRPC_VERSION, raw_req.id, raw_req.method, map[string]string}
-	params_arr := find_between(raw_req.params, '{', '}').split(',')
+	params_arr := get_text_between(raw_req.params, '{', '}').split(',')
 
 	for pkv in params_arr {
 		p := pkv.split(':')
-		key := p[0].find_between('"', '"')
-		val := p[1].find_between('"', '"')
+		// TODO: Support other types. Look into json module
+		key := get_text_between(p[0], '"', '"')
+		val := get_text_between(p[1], '"', '"')
 
 		req.params[key] = val
 	}
@@ -209,7 +218,7 @@ pub fn (server mut Server) start_and_listen(port_num int) {
 	server.port = port_num
 
 	listener := net.listen(server.port) or {panic('Failed to listen to port ${server.port}')}
-	mut logg := log.Log{ level: 4, output: 'terminal' }
+	mut logg := log.Log{ level: 4 }
 
 	logg.info('JSON-RPC Server has started on port ${server.port}')
 	for {
