@@ -36,8 +36,7 @@ fn test_register_procedure() {
 }
 
 fn test_process_raw_request() {
-	// For now it only supports string args
-	json_str := '{"jsonrpc": "2.0", "method": "subtract", "params": {"left": "40", "right": "20"}, "id": 1}'
+	json_str := '{"jsonrpc": "2.0", "method": "subtract", "params": {"left": 40, "right": 20}, "id": 1}'
 
 	// TODO: Make the second parameter reflect reality and test if accordling
 	raw_request := process_raw_request(json_str, "")
@@ -46,7 +45,7 @@ fn test_process_raw_request() {
 	assert raw_request.id == 1
 	assert raw_request.method == "subtract"
 	// assert raw_request.headers == {}
-	assert raw_request.params == '{"left":"40","right":"20"}'
+	assert raw_request.params == '{"left":40,"right":20}'
 }
 
 fn test_process_request() {
@@ -63,8 +62,16 @@ fn test_process_request() {
 	assert request.jsonrpc == "2.0"
 	assert request.id == 1
 	assert request.method == "subtract"
-	assert request.params["left"] == "40"
-	assert request.params["right"] == "20"
+
+	actual_left := request.params.get("left") or {
+		panic(err)
+	}
+	actual_right := request.params.get("right") or {
+		panic(err)
+	}
+
+	assert 40 == actual_left.as_int()
+	assert 20 == actual_right.as_int()
 }
 
 // helpers
@@ -74,8 +81,12 @@ fn sample_procedure(ctx Context) string {
 }
 
 fn sample_subtract_procedure(ctx Context) int {
-	left := ctx.req.params["left"].int()
-	right := ctx.req.params["right"].int()
+	left := ctx.req.params.get("left") or {
+		panic(err)
+	}
+	right := ctx.req.params.get("right") or {
+		panic(err)
+	}
 
-	return left - right
+	return left.as_int() - right.as_int()
 }

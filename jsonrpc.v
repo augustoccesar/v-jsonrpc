@@ -56,7 +56,8 @@ pub:
     id int
     method string
 mut:
-    params map[string]string
+	// TODO: Support array params
+    params JsonObject
 }
 
 // pub struct Request<T> {
@@ -172,17 +173,14 @@ fn (res &Response) send(conn net.Socket) {
 }
 
 fn process_request(raw_req RawRequest) Request {
-	mut req := Request{JRPC_VERSION, raw_req.id, raw_req.method, map[string]string}
-	params_arr := get_text_between(raw_req.params, '{', '}').split(',')
+	mut req := Request{JRPC_VERSION, raw_req.id, raw_req.method, JsonObject{}}
 
-	for pkv in params_arr {
-		p := pkv.split(':')
-		// TODO: Support other types. Look into json module
-		key := get_text_between(p[0], '"', '"')
-		val := get_text_between(p[1], '"', '"')
-
-		req.params[key] = val
+	json_object := parse_json_object(raw_req.params) or {
+		//TODO: Maybe a better solution than panic?
+		panic("unable to parse param json")
 	}
+
+	req.params = json_object
 
 	return req
 }
@@ -205,13 +203,9 @@ fn process_raw_request(json_str string, raw_contents string) RawRequest {
 		return raw_req
 	} else {
 		from_json := json.decode(RawRequest, json_str) or { return raw_req }
-		raw_req.jsonrpc = from_json.jsonrpc
-		raw_req.id = from_json.id
-		raw_req.method = from_json.method
-		raw_req.params = from_json.params
-	}
 
-	return raw_req
+		return from_json
+	}
 }
 
 pub fn (server mut Server) start_and_listen(port_num int) {
@@ -271,5 +265,5 @@ pub fn (server mut Server) register_procedure(method_name string, proc_func fn (
 }
 
 pub fn new() Server {
-	return Server{ port: 8046, procs: []Procedure }
+	return Server{ port: 8046, procs: [] }
 }
