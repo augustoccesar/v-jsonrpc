@@ -22,14 +22,13 @@ fn parse_json_object(s string) ?JsonObject {
 		kv := kv_string.split(":")
 
 		mut key := kv[0].trim_space()
-		mut value := kv[1].trim_space()
+		value := kv[1].trim_space()
 
 		if value.starts_with("{") || value.starts_with("[") {
 			return error("nested json not implemented")
 		}
 
 		key = key.replace('"', "")
-		value = value.replace('"', "")
 
 		json_object.content[key] = value
 	}
@@ -69,19 +68,48 @@ fn (json_object JsonObject) get(field string) ?JsonField {
 		return error("field not found")
 	}
 
-	found_field_value := json_object.content[field]
+	mut found_field_value := json_object.content[field]
 
-	return JsonField{key: field, value: found_field_value}
+	mut quoted := false
+	if found_field_value[0] == `"` {
+		quoted = true
+	}
+
+	found_field_value = found_field_value.replace('"', "")
+
+	return JsonField{key: field, value: found_field_value, quoted: quoted}
 }
 
 fn (json_object JsonObject) to_json() string {
-	panic("not implemented yet")
+	mut fields := []string
+
+	for k, _ in json_object.content {
+		field := json_object.get(k) or {
+			// TODO: How to handle this?
+			continue
+		}
+		mut parsed_value := field.value
+
+		guessed_type := field.guess_type()
+		if guessed_type == "string" {
+			parsed_value = '"$field.value"'
+		} else if guessed_type == "object" {
+			parsed_value = field.as_json_object().to_json()
+		} else if guessed_type == "array" {
+			panic("json array not supported yet")
+		}
+
+		fields << '"$k":$parsed_value'
+	}
+
+	return "{" + fields.join(",") + "}"
 }
 
 struct JsonField {
 pub:
 	key string
 	value string
+	quoted bool
 }
 
 fn (json_field JsonField) as_str() string {
@@ -96,24 +124,31 @@ fn (json_field JsonField) as_bool() bool {
 	return json_field.value.bool()
 }
 
+fn (json_field JsonField) as_json_object() JsonObject {
+	json_object := parse_json_object(json_field.value) or {
+		// TODO: Proper handling
+		panic("well...")
+	} 
+
+	return json_object
+}
+
 fn (json_field JsonField) is_null() bool {
 	return json_field.value == "null"
 }
 
 fn (json_field JsonField) guess_type() string {
-	// numeric_regex := "^-?\d*\.?\d*$"
-	// object_regex := "^{.*}$"
-	// array_regex := "^[.*]$"
-	// boolean_regex := "^true|false$"
-	// null_regex := "^null$"
-
 	value := json_field.value
 
-	mut re_numeric, _, _ := regex.regex("^-?\d*\.?\d*$")
-	mut re_object, _, _ := regex.regex("^\{.*\}$")
-	mut re_array, _, _ := regex.regex("^[.*]$")
-	mut re_boolean, _, _ := regex.regex("^(true)|(false)$")
-	mut re_null, _, _ := regex.regex("^null$")
+	if json_field.quoted {
+		return "string"
+	}
+
+	mut re_numeric, _, _ := regex.regex(r"^-?\d*\.?\d*$")
+	mut re_object, _, _ := regex.regex(r"^\{.*\}$")
+	mut re_array, _, _ := regex.regex(r"^\[.*\]$")
+	mut re_boolean, _, _ := regex.regex(r"^(true)|(false)$")
+	mut re_null, _, _ := regex.regex(r"^null$")
 
 	mut start, _ := re_numeric.match_string(value)
 	if start > -1 {

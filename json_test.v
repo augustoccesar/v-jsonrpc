@@ -71,14 +71,14 @@ fn test_json_field_guess_type() {
 	assert JsonField{key: "key", value: "false"}.guess_type() == "boolean"
 
 	assert JsonField{key: "key", value: "1"}.guess_type() == "numeric"
-	// assert JsonField{key: "key", value: "1.0"}.guess_type() == "numeric" // Failling
-	// assert JsonField{key: "key", value: "1000"}.guess_type() == "numeric" // Failling
-	// assert JsonField{key: "key", value: "0.0000001"}.guess_type() == "numeric" // Failling
+	assert JsonField{key: "key", value: "1.0"}.guess_type() == "numeric" // Failling
+	assert JsonField{key: "key", value: "1000"}.guess_type() == "numeric" // Failling
+	assert JsonField{key: "key", value: "0.0000001"}.guess_type() == "numeric" // Failling
 	assert JsonField{key: "key", value: "-1"}.guess_type() == "numeric"
-	// assert JsonField{key: "key", value: "-1.0"}.guess_type() == "numeric" // Failling
-	// assert JsonField{key: "key", value: "-0.00001"}.guess_type() == "numeric" // Failling
+	assert JsonField{key: "key", value: "-1.0"}.guess_type() == "numeric" // Failling
+	assert JsonField{key: "key", value: "-0.00001"}.guess_type() == "numeric" // Failling
 
 	assert JsonField{key: "key", value: '{"key", "val"}'}.guess_type() == "object"
 
-	// assert JsonField{key: "key", value: "[1, 2, 3]"}.guess_type() == "array" // Failling
+	assert JsonField{key: "key", value: "[1, 2, 3]"}.guess_type() == "array" // Failling
 }

@@ -35,12 +35,6 @@ struct Procedure {
 	func fn (Context) string
 }
 
-// struct Procedure<T> {
-// 	name string
-// 	func fn (Context) string
-// 	result T
-// }
-
 struct RawRequest {
 mut:
     jsonrpc string
@@ -60,15 +54,6 @@ mut:
     params JsonObject
 }
 
-// pub struct Request<T> {
-// pub:
-//     jsonrpc string
-//     id int
-//     method string
-// mut:
-//     params T
-// }
-
 pub struct Response {
     jsonrpc string
 mut:
@@ -77,25 +62,27 @@ mut:
     result string
 }
 
-// pub struct Response<T> {
-//     jsonrpc string
-// mut:
-//     id int
-//     error ResponseError [json:error]
-//     result T
-// }
-
 struct ResponseError {
 mut:
     code int
     message string
+    // TODO: Support JsonObject&JsonArray on data
     data string
 }
 
-pub struct Server {
-mut:
-	port int
-	procs []Procedure
+fn (error ResponseError) json() string {
+	mut jo := JsonObject{content: map[string]string}
+
+	// TODO: Figure out why is this breaking
+	// jo.content["code"] = error.code.str()
+	// jo.content["message"] = error.message
+	// jo.content["data"] = error.data
+
+	jo.content["code"] = "code"
+	jo.content["message"] = "message"
+	jo.content["data"] = "data"
+
+	return jo.to_json()
 }
 
 pub fn (res mut Response) send_error(err_code int) {
@@ -119,37 +106,20 @@ fn err_message(err_code int) string {
 	return msg
 }
 
-// get_text_between gets all the text inside `s` between `start` character and `end` character
-fn get_text_between(s string, start, end string) string {
-	start_pos := s.index(start) or {
-		return ""
-	}
-	
-	val := s.right(start_pos + start.len)
-	end_pos := val.last_index(end) or {
-		return val
-	}
-
-	return val.left(end_pos)
-}
-
-
 fn (res Response) json() string {
-	mut res_json_arr := []string
+	mut jo := JsonObject{content: map[string]string}
 
-	res_json_arr << '"jsonrpc":"${res.jsonrpc}"'
-	
-	if res.id != 0 {
-		res_json_arr << '"id":${res.id}'
-	}
+	// TODO: Figure a way to not have to wrap this in quotes
+	jo.content["jsonrpc"] = '"$res.jsonrpc"'
+	jo.content["id"] = res.id.str()
 
 	if res.error.message.len != 0 {
-		res_json_arr << '"error": {"code":${res.error.code},"message":"${res.error.message}","data":"${res.error.data}"}'
+		jo.content["error"] = res.error.json()
 	} else {
-		res_json_arr << '"result":"${res.result}"'
+		jo.content["result"] = res.result
 	}
 
-	return '{' + res_json_arr.join(',') + '}'
+	return jo.to_json()
 }
 
 pub fn (err ResponseError) str() string {
@@ -185,17 +155,7 @@ fn process_request(raw_req RawRequest) Request {
 	return req
 }
 
-fn (server Server) proc_index(name string) int {
-	for i, proc in server.procs {
-		if proc.name == name {
-			return i
-		}
-	}
-
-	return -1
-}
-
-fn process_raw_request(json_str string, raw_contents string) RawRequest {
+fn create_raw_request(json_str string, raw_contents string) RawRequest {
 	mut raw_req := RawRequest{}
 	raw_req.headers = http.parse_headers(raw_contents.split_into_lines())
 
@@ -206,6 +166,22 @@ fn process_raw_request(json_str string, raw_contents string) RawRequest {
 
 		return from_json
 	}
+}
+
+pub struct Server {
+mut:
+	port int
+	procs []Procedure
+}
+
+fn (server Server) proc_index(name string) int {
+	for i, proc in server.procs {
+		if proc.name == name {
+			return i
+		}
+	}
+
+	return -1
 }
 
 pub fn (server mut Server) start_and_listen(port_num int) {
@@ -226,7 +202,7 @@ pub fn (server mut Server) start_and_listen(port_num int) {
 		s := conn.read_line()
 		vals := s.split_into_lines()
 		content := vals[vals.len-1]
-		raw_req := process_raw_request(content, s)
+		raw_req := create_raw_request(content, s)
 		req := process_request(raw_req) 
 
 		if s == '' {

@@ -1,32 +1,5 @@
 module jsonrpc
 
-fn test_get_text_between() {
-	test_cases := [
-		[
-			'{"key1": "val1", "key2": "val2"}',
-			'{',
-			'}',
-			'"key1": "val1", "key2": "val2"'
-		],
-		[
-			'{}',
-			'{',
-			'}',
-			''
-		],
-		[
-			'',
-			'{',
-			'}',
-			''
-		],
-	]
-
-	for test_case in test_cases {
-		assert get_text_between(test_case[0], test_case[1], test_case[2]) == test_case[3]
-	}
-}
-
 fn test_register_procedure() {
 	mut server := new()
 
@@ -35,11 +8,11 @@ fn test_register_procedure() {
 	assert server.procs.len == 1
 }
 
-fn test_process_raw_request() {
+fn test_create_raw_request() {
 	json_str := '{"jsonrpc": "2.0", "method": "subtract", "params": {"left": 40, "right": 20}, "id": 1}'
 
 	// TODO: Make the second parameter reflect reality and test if accordling
-	raw_request := process_raw_request(json_str, "")
+	raw_request := create_raw_request(json_str, "")
 
 	assert raw_request.jsonrpc == "2.0"
 	assert raw_request.id == 1
@@ -72,6 +45,35 @@ fn test_process_request() {
 
 	assert 40 == actual_left.as_int()
 	assert 20 == actual_right.as_int()
+}
+
+fn test_response_json() {
+	responses := [
+		Response{
+			jsonrpc: "2.0",
+			id: 1,
+			result: "1"
+		}
+		// Response{
+		// 	jsonrpc: "2.0",
+		// 	id: 1,
+		// 	error: ResponseError {
+		// 		code: 1,
+		// 		message: "Sample Error",
+		// 		data: "data"
+		// 	}
+		// }
+	]
+
+	expected_results := [
+		'{"jsonrpc":"2.0","id":1,"result":1}'
+		// '{"jsonrpc":"2.0","id":1,"error": {"code":1,"message":"Sample Error","data":"data"}}'
+	]
+
+	for i, response in responses {
+		println(response.json())
+		assert expected_results[i] == response.json()
+	}
 }
 
 // helpers
